@@ -1,15 +1,47 @@
+;;The Evolution of Religion
+;; This NetLogo model is to simulate the evolution of religion
+
 ;; Breeds and their shared or type-specific attributes
-breed[humans human]       ;; set size 1 for regular human to distinguish them in the interface from other breeds
-breed[preachers preacher] ;; set size 5 for preacher
-breed[prophets propeth]   ;; set size 50 for the propeth
+
+breed[humans human]               ;; set size 1 for regular human to distinguish them in the interface from other breeds
+breed[preachers preacher]         ;; set size 5 for preacher
+breed[prophets propeth]           ;; set size 50 for the propeth
+
+turtles-own[
+
+  age                             ;; 1:N       (current age of the agent)
+  lifespan                        ;; N         (age of death of the agent)
+  religion                        ;; string    (religion of the agent)
+  religiosity                     ;; 0:10      (religiosity of the agent)
+  openness                        ;; 0:10      (how open the agent is to new ideas)
+  trust                           ;; 0:10      (how confidental the agent is)
+  influence                       ;; 0:10      (how influential the agent is in the world)
+  radius                          ;; 0:N       (physical radius of interaction)
+
+]
 
 
 ;; Global variables declared on the interface:
-;; 1. population-size (size of starting population)
-;; 2. world-events (enables/disables world events)
-;; 3. world-events-impact-coefficient (determines the impact that the world events will have on religions)
+;; population-size                   0:N       (size of starting population)
+;; world-events                      T:F       (enables/disables world events)
+;; world-events-frequency            0:N       (determines the max frequency of world events by the formula (random thisVariable))
+;; world-events-impact-coefficient   0:N       (determines the impact that the world events will have on religions)
 globals[
 
+  world-age                        ;; 0:N      (current age of the world)
+  world-technological-advancement  ;; 0:100    (technological advancement of the world)
+  world-economy?                   ;; T:F      (whether the world economy is stable or not)   MOZDA DA RAZMJENJUJU NOVAC AGENTI PA DA TAKO UTICEMO NA EKONOMIJU..
+  world-peace?                     ;; T:F      (whether the world is at peace or not)
+
+  ;; Temp Variables
+
+  world-events-current-frequency
+  world-preachers-percentage
+
+  ;; Religions
+  world-religions
+  world-religions-colors
+  world-religions-population
 
 ]
 
@@ -19,10 +51,30 @@ to setup
   clear-all
   reset-ticks
 
+  init-variables
   init-patches
   init-turtles
 
   print-world-config
+  ;;show word "Most dominant religion: " get-world-religion-influence["christianity"]   - Get Religion Current Influence
+
+end
+
+;; Init World Variables
+to init-variables
+
+  set world-age 1
+  set world-technological-advancement 1
+  set world-preachers-percentage world-preachers-percentage-ui ;;Setting the preachers percentage according to the UI
+
+  set world-events-current-frequency random world-events-frequency ;;Setting the current world event frequency
+
+  ifelse(world-preachers-percentage > 0.001)[set world-preachers-percentage world-preachers-percentage / 100] ;;Taking the percentage and transforming it into decimals
+  [set world-preachers-percentage 0.01]
+
+  set world-religions["christianity" "islam" "hinduism" "atheism" "budhism" "folk-religion" "other-religion"]    ;; Religions of the world
+  set world-religions-colors[white green brown red gray pink yellow]                                             ;; Colors to represent religion
+  set world-religions-population[0.31 0.24 0.15 0.16 0.07 0.06 0.005]                                            ;; Percentage of agents per religion
 
 end
 
@@ -40,16 +92,46 @@ end
 ;; Init Turtles Method
 to init-turtles
 
-  create-turtles population-size
+  let number-of-preachers (int(world-preachers-percentage * population-size))
+  let number-of-humans (population-size - number-of-preachers)
+
+  create-humans population-size
+  create-preachers number-of-preachers
 
   ask turtles[
 
-    setxy random-xcor random-ycor
-
-    set shape "person"
-    set color green
-
+    turtles-set-init-values
   ]
+
+  ;; Assigning religions per percentage, data from: Size of Major Religious Groups, 2020 on Wikipedia
+  let counter 0
+  foreach(world-religions-population)[
+
+    let percentage int(item counter world-religions-population * population-size)
+
+    ask n-of percentage turtles with[religion = "none"][set religion item counter world-religions set color item counter world-religions-colors]
+
+    set counter counter + 1
+  ]
+
+end
+
+to turtles-set-init-values
+
+  setxy random-xcor random-ycor
+
+  set shape "person"
+  set age 0
+
+  set lifespan random 150
+  if lifespan < 18[set lifespan lifespan + 18]
+
+
+  if (breed = humans)   [set size 1]
+  if (breed = preachers)[set size 6]
+  if (breed = prophets) [set size 30]
+
+  set religion "none"
 
 end
 
@@ -58,9 +140,17 @@ to print-world-config
 
   show "--------------------"
   show "World Configuration"
+  show "***"
 
   show word "World Population: " population-size
 
+  let number-of-preachers (int(world-preachers-percentage * population-size))
+  let number-of-humans (population-size - number-of-preachers)
+
+  show word "Humans: " number-of-humans
+  show word "Preachers: " number-of-preachers
+
+  show "***"
   ifelse world-events[                                        ;; We print the world-events configuration if they are enabled
     show "World Events: Enabled"
     show word "World Events Impact Percentage: " world-events-impact-coefficient
@@ -81,10 +171,22 @@ to go-once
   ask turtles[
 
     turtles-move
+    turtles-age
+
+    if (breed = humans)[
+      ;; Human specific behaviors
+    ]
+    if (breed = preachers)[
+      ;; Preacher specific behaviors
+    ]
+    if (breed = prophets)[
+      ;; Prophet specific behaviors
+    ]
 
   ]
 
-  tick
+  world-event-check  ;; Check if it is time for a world event
+  world-update       ;; Update the world variables such as age, technology, etc ...
 end
 
 ;; Turtle Movement - they move in random directions 1 field per tick
@@ -93,15 +195,96 @@ to turtles-move
   lt random 100
   fd 1
 end
+
+;; Turtles age
+to turtles-age
+
+  set age age + 1
+
+  if age > lifespan[
+
+    turtles-born ;; OVO PROMJENITI NEGDJE DA SE MOZE REPRODUCIRATI
+    die
+  ]
+
+end
+
+;; Birth of turtle
+to turtles-born
+
+  let temp-religion religion
+  let temp-color color
+
+  hatch-humans 1[
+
+    turtles-set-init-values
+
+    set religion temp-religion
+    set color temp-color
+  ]
+
+end
+
+;; World Update - update the world variables as per year
+to world-update
+
+  tick
+
+  set world-age world-age + 1
+
+  if (world-age mod 50 = 0)[set world-technological-advancement world-technological-advancement + 1] ;; Increasing the technological advancement of the world every N(50)years.
+
+end
+
+;; World Events - Create World Events
+to world-event-check
+
+  if world-events[
+
+    if(world-age mod world-events-current-frequency = 0)[world-event-execute]   ;;We check if the world-event is to happen
+
+  ]
+
+end
+
+to world-event-execute
+
+  let impact-level random 6
+  let impact-sign random 2
+
+  show "*********************************"
+  show "World Event Happening.."
+  show word "Impact Level: " impact-level
+
+  ifelse(impact-sign = 1)[show "Impact Sign: Positive"]
+  [show "Impact Sign: Negative"]
+
+  set world-events-current-frequency random world-events-frequency ;;Setting the current world event frequency
+
+  ;; EXECUTE WORLD EVENT
+
+  show word "Next event in years: " world-events-current-frequency
+  show "*********************************"
+
+end
+
+;; Get Religion current world-influence
+to-report get-world-religion-influence [temp-religion]
+
+  let followers count turtles with[religion = "christianity"]
+
+  report ( followers / population-size) * 100.00
+
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
-364
-79
-1273
-689
+367
+83
+1277
+694
 -1
 -1
-1.0
+1.002
 1
 10
 1
@@ -192,22 +375,22 @@ world-events-impact-coefficient
 world-events-impact-coefficient
 0
 100
-6.0
+30.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-27
-201
-268
-234
+141
+214
+302
+247
 population-size
 population-size
 0
 20000
-20000.0
+9048.0
 1
 1
 NIL
@@ -223,6 +406,213 @@ world-events-frequency
 1
 0
 Number
+
+MONITOR
+28
+280
+106
+325
+Year
+world-age
+0
+1
+11
+
+MONITOR
+133
+281
+299
+326
+Technological Advancement
+world-technological-advancement
+2
+1
+11
+
+INPUTBOX
+30
+187
+131
+247
+world-preachers-percentage-ui
+2.0
+1
+0
+Number
+
+PLOT
+13
+412
+347
+562
+Population
+Time
+Agents
+0.0
+10.0
+0.0
+10.0
+true
+true
+"" ""
+PENS
+"Humans" 1.0 0 -16777216 true "" "plot count humans"
+"Preachers" 1.0 0 -4757638 true "" "plot count preachers"
+"Prophets" 1.0 0 -1184463 true "" "plot count prophets"
+
+MONITOR
+14
+357
+111
+402
+Humans
+count humans
+1
+1
+11
+
+MONITOR
+131
+358
+225
+403
+Preachers
+count preachers
+1
+1
+11
+
+MONITOR
+247
+360
+346
+405
+Prophets
+count prophets
+1
+1
+11
+
+TEXTBOX
+218
+20
+368
+60
+World Events Configuration
+14
+0.0
+1
+
+TEXTBOX
+178
+181
+328
+199
+World Configuration
+14
+0.0
+1
+
+PLOT
+22
+705
+348
+855
+Followers over time
+Time
+Followers
+0.0
+10.0
+0.0
+10.0
+true
+true
+"" ""
+PENS
+"Islam" 1.0 0 -13840069 true "" "plot count turtles with[religion = \"islam\"]"
+"Christianity" 1.0 0 -14737633 true "" "plot count turtles with[religion = \"christianity\"]"
+"Budhism" 1.0 0 -4539718 true "" "plot count turtles with[religion = \"budhism\"]"
+"Atheism" 1.0 0 -5298144 true "" "plot count turtles with[religion = \"atheism\"]"
+"Hinduism" 1.0 0 -6459832 true "" "plot count turtles with[religion = \"hinduism\"]"
+"Other religions" 1.0 0 -723837 true "" "plot count turtles with[religion = \"other-religion\"]"
+"Folk religions" 1.0 0 -1264960 true "" "plot count turtles with[religion = \"other-religion\"]"
+
+MONITOR
+116
+593
+173
+638
+Muslims
+count turtles with[religion = \"islam\"]
+17
+1
+11
+
+MONITOR
+27
+591
+94
+636
+Christians
+count turtles with[religion = \"christianity\"]
+17
+1
+11
+
+MONITOR
+28
+650
+101
+695
+Budhists
+count turtles with[religion = \"budhism\"]
+17
+1
+11
+
+MONITOR
+289
+592
+347
+637
+Atheists
+count turtles with[religion = \"atheism\"]
+17
+1
+11
+
+MONITOR
+192
+593
+271
+638
+Hindus
+count turtles with[religion = \"atheism\"]
+17
+1
+11
+
+MONITOR
+251
+651
+348
+696
+Other Religions
+count turtles with[religion = \"other-religion\"]
+17
+1
+11
+
+MONITOR
+130
+651
+217
+696
+Folk Religions
+count turtles with[religion = \"folk-religion\"]
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
