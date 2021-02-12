@@ -17,6 +17,7 @@ turtles-own[
   trust                           ;; 0:10      (how confidental the agent is)
   influence                       ;; 0:10      (how influential the agent is in the world)
   radius                          ;; 0:N       (physical radius of interaction)
+  movementSpeed                   ;; 1:N       (defines node moves per tick)
 
 ]
 
@@ -56,7 +57,7 @@ to setup
   init-turtles
 
   print-world-config
-  ;;show word "Most dominant religion: " get-world-religion-influence["christianity"]   - Get Religion Current Influence
+  ;;show word "Most dominant starting religion: " get-world-religion-influence["christianity"]   - Get Religion Current Influence
 
 end
 
@@ -65,12 +66,14 @@ to init-variables
 
   set world-age 1
   set world-technological-advancement 1
+  set world-peace? true
+  set world-economy? true
   set world-preachers-percentage world-preachers-percentage-ui ;;Setting the preachers percentage according to the UI
 
   set world-events-current-frequency random world-events-frequency ;;Setting the current world event frequency
 
-  ifelse(world-preachers-percentage > 0.001)[set world-preachers-percentage world-preachers-percentage / 100] ;;Taking the percentage and transforming it into decimals
-  [set world-preachers-percentage 0.01]
+  ifelse(world-preachers-percentage != 0)[set world-preachers-percentage world-preachers-percentage / 100] ;;Taking the percentage and transforming it into decimals
+  [set world-preachers-percentage 0]
 
   set world-religions["christianity" "islam" "hinduism" "atheism" "budhism" "folk-religion" "other-religion"]    ;; Religions of the world
   set world-religions-colors[white green brown red gray pink yellow]                                             ;; Colors to represent religion
@@ -127,9 +130,14 @@ to turtles-set-init-values
   if lifespan < 18[set lifespan lifespan + 18]
 
 
-  if (breed = humans)   [set size 1]
-  if (breed = preachers)[set size 6]
-  if (breed = prophets) [set size 30]
+  if (breed = humans)   [set size 1 set radius 1 set movementSpeed 1]
+  if (breed = preachers)[set size 6 set radius 3 set movementSpeed 2]
+
+  set religion random 11
+  set religiosity random 11
+  set openness random 11
+  set trust random 11
+  set influence random 11
 
   set religion "none"
 
@@ -140,7 +148,7 @@ to print-world-config
 
   show "--------------------"
   show "World Configuration"
-  show "***"
+  show "                                    "
 
   show word "World Population: " population-size
 
@@ -150,7 +158,11 @@ to print-world-config
   show word "Humans: " number-of-humans
   show word "Preachers: " number-of-preachers
 
-  show "***"
+  show "                                    "
+  show "World Peace: Active"
+  show "World Economy: Stable"
+
+  show "                                    "
   ifelse world-events[                                        ;; We print the world-events configuration if they are enabled
     show "World Events: Enabled"
     show word "World Events Impact Percentage: " world-events-impact-coefficient
@@ -172,6 +184,7 @@ to go-once
 
     turtles-move
     turtles-age
+    check-for-mutation
 
     if (breed = humans)[
       ;; Human specific behaviors
@@ -193,7 +206,7 @@ end
 to turtles-move
   rt random 100
   lt random 100
-  fd 1
+  fd movementSpeed
 end
 
 ;; Turtles age
@@ -203,14 +216,37 @@ to turtles-age
 
   if age > lifespan[
 
-    turtles-born ;; OVO PROMJENITI NEGDJE DA SE MOZE REPRODUCIRATI
-    die
+    if count turtles > 25000 [die]
+
+    if world-mortality = "Constant"[turtles-born die]
+    if world-mortality = "Simulated"[  ;; Code for simulated reporoduction
+
+      let children random 2
+
+      if (children = 0)[
+        let number-of-children random 3
+
+        loop[
+          ifelse(number-of-children != 0)[
+
+            set number-of-children number-of-children - 1
+            turtles-born
+
+          ][stop]
+        ]
+      ]
+      die
+    ]
+    if world-mortality = "Increasing"[if count turtles > 1000 [die]]
+    if world-mortality = "Decreasing"[turtles-born turtles-born die]
   ]
 
 end
 
 ;; Birth of turtle
 to turtles-born
+
+  if count turtles > 25000 [stop]
 
   let temp-religion religion
   let temp-color color
@@ -276,15 +312,83 @@ to-report get-world-religion-influence [temp-religion]
   report ( followers / population-size) * 100.00
 
 end
+
+to check-for-mutation
+
+  if (breed = humans)[  ;; Mutate high-engaging humans into preachers
+
+    if(age > 18 AND religiosity >= 8 AND openness >= 8 AND trust > 8 AND influence > 7)[
+
+      hatch-preachers 1[
+
+        init-mutation age lifespan religion religiosity openness trust influence
+
+      ]
+      die
+    ]
+  ]
+
+  if (breed = preachers)[  ;; Mutate a rare preacher into a prophet
+
+    if(age > 30 AND religiosity = 10 AND openness = 10 AND trust = 10 AND influence = 10 AND religion != "atheism" AND count prophets = 0)[
+
+      hatch-prophets 1[
+
+        init-mutation age (lifespan + 150) religion religiosity openness trust influence
+
+      ]
+
+      show "A new prophet has arrived!"
+      show word "Prophet religion: " religion
+      die
+    ]
+  ]
+
+end
+
+to init-mutation[temp-age temp-lifespan temp-religion temp-religiosity temp-openness temp-trust temp-influence]
+
+  set shape "person"
+  set age temp-age
+  set lifespan temp-lifespan
+  set religion temp-religion
+  set religiosity temp-religiosity
+  set openness temp-openness
+  set trust temp-trust
+  set influence temp-influence
+  set size 6
+
+  if(breed = humans)[set radius 1]
+  if(breed = preachers)[set radius 3 set movementSpeed 2]
+  if(breed = prophets)[
+    set size 30
+    set radius 30
+    set movementSpeed 5
+  ]
+
+end
+
+to print-agent-attributes
+
+  show word "Agent ID: " who
+  show word "Age: " age
+  show word "Lifespan: " lifespan
+  show word "Religion: "religion
+  show word "Religiosity: " religiosity
+  show word "Oppenness: " openness
+  show word "Trust: " trust
+  show word "Influence: " influence
+
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
-367
-83
-1277
-694
+364
+81
+1276
+693
 -1
 -1
-1.002
+1.00333
 1
 10
 1
@@ -367,7 +471,7 @@ world-events
 -1000
 
 SLIDER
-29
+16
 109
 304
 142
@@ -390,14 +494,14 @@ population-size
 population-size
 0
 20000
-9048.0
+8082.0
 1
 1
 NIL
 HORIZONTAL
 
 INPUTBOX
-30
+17
 37
 163
 97
@@ -408,10 +512,10 @@ world-events-frequency
 Number
 
 MONITOR
-28
-280
-106
-325
+786
+27
+864
+72
 Year
 world-age
 0
@@ -419,32 +523,21 @@ world-age
 11
 
 MONITOR
-133
-281
-299
-326
+886
+26
+1030
+71
 Technological Advancement
 world-technological-advancement
 2
 1
 11
 
-INPUTBOX
-30
-187
-131
-247
-world-preachers-percentage-ui
-2.0
-1
-0
-Number
-
 PLOT
-13
-412
-347
-562
+17
+564
+266
+721
 Population
 Time
 Agents
@@ -461,10 +554,10 @@ PENS
 "Prophets" 1.0 0 -1184463 true "" "plot count prophets"
 
 MONITOR
-14
-357
-111
-402
+282
+564
+342
+609
 Humans
 count humans
 1
@@ -472,10 +565,10 @@ count humans
 11
 
 MONITOR
-131
-358
-225
-403
+281
+622
+344
+667
 Preachers
 count preachers
 1
@@ -483,10 +576,10 @@ count preachers
 11
 
 MONITOR
-247
-360
-346
-405
+280
+675
+347
+720
 Prophets
 count prophets
 1
@@ -514,10 +607,10 @@ World Configuration
 1
 
 PLOT
-22
-705
-348
-855
+17
+389
+342
+539
 Followers over time
 Time
 Followers
@@ -538,10 +631,10 @@ PENS
 "Folk religions" 1.0 0 -1264960 true "" "plot count turtles with[religion = \"other-religion\"]"
 
 MONITOR
-116
-593
-173
-638
+109
+277
+181
+322
 Muslims
 count turtles with[religion = \"islam\"]
 17
@@ -549,10 +642,10 @@ count turtles with[religion = \"islam\"]
 11
 
 MONITOR
-27
-591
-94
-636
+19
+278
+93
+323
 Christians
 count turtles with[religion = \"christianity\"]
 17
@@ -560,10 +653,10 @@ count turtles with[religion = \"christianity\"]
 11
 
 MONITOR
-28
-650
-101
-695
+19
+335
+92
+380
 Budhists
 count turtles with[religion = \"budhism\"]
 17
@@ -571,10 +664,10 @@ count turtles with[religion = \"budhism\"]
 11
 
 MONITOR
-289
-592
-347
-637
+280
+276
+338
+321
 Atheists
 count turtles with[religion = \"atheism\"]
 17
@@ -582,10 +675,10 @@ count turtles with[religion = \"atheism\"]
 11
 
 MONITOR
-192
-593
-271
-638
+198
+276
+265
+321
 Hindus
 count turtles with[religion = \"atheism\"]
 17
@@ -593,10 +686,10 @@ count turtles with[religion = \"atheism\"]
 11
 
 MONITOR
-251
-651
-348
-696
+242
+335
+339
+380
 Other Religions
 count turtles with[religion = \"other-religion\"]
 17
@@ -604,12 +697,59 @@ count turtles with[religion = \"other-religion\"]
 11
 
 MONITOR
-130
-651
-217
-696
+109
+335
+226
+380
 Folk Religions
 count turtles with[religion = \"folk-religion\"]
+17
+1
+11
+
+SLIDER
+17
+215
+132
+248
+world-preachers-percentage-ui
+world-preachers-percentage-ui
+0
+20
+0.0
+1
+1
+NIL
+HORIZONTAL
+
+CHOOSER
+16
+157
+155
+202
+world-mortality
+world-mortality
+"Simulated" "Constant" "Increasing" "Decreasing"
+0
+
+MONITOR
+1049
+26
+1139
+71
+World Peace?
+world-peace?
+17
+1
+11
+
+MONITOR
+1157
+26
+1263
+71
+Stable Economy?
+world-economy?
 17
 1
 11

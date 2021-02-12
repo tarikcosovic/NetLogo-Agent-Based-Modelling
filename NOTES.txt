@@ -1,6 +1,7 @@
-Interface - selector : Select the agents movement type (random - heards - other)
+HIGH PRIORITY: Add Agent Behaviors
 
-Add Agent Behaviors
-Add Agent Mutation
+DONE: Add Agent Mutation -> AFTER Successful trade of skill from another agent
 
-Add Video-Recording and Data Output
+MEDIUM PRIORITY: ADD WORLD EVENTS IMPACT 
+
+LOW PRIORITY: Add Video-Recording and Data Output
