@@ -66,11 +66,11 @@ to init-variables
 
   set world-age 1
   set world-technological-advancement 1
-  set world-peace? true
-  set world-economy? true
+  set world-peace? false
+  set world-economy? false
   set world-preachers-percentage world-preachers-percentage-ui ;;Setting the preachers percentage according to the UI
 
-  set world-events-current-frequency random world-events-frequency ;;Setting the current world event frequency
+  set world-events-current-frequency (random world-events-frequency) + 1 ;;Setting the current world event frequency
 
   ifelse(world-preachers-percentage != 0)[set world-preachers-percentage world-preachers-percentage / 100] ;;Taking the percentage and transforming it into decimals
   [set world-preachers-percentage 0]
@@ -126,7 +126,7 @@ to turtles-set-init-values
   set shape "person"
   set age 0
 
-  set lifespan random 150
+  set lifespan random 300
   if lifespan < 18[set lifespan lifespan + 18]
 
 
@@ -184,16 +184,18 @@ to go-once
 
     turtles-move
     turtles-age
-    check-for-mutation
 
     if (breed = humans)[
       ;; Human specific behaviors
+      human-interaction
     ]
     if (breed = preachers)[
+      preacher-interaction
       ;; Preacher specific behaviors
     ]
     if (breed = prophets)[
       ;; Prophet specific behaviors
+      prophet-interaction
     ]
 
   ]
@@ -251,12 +253,26 @@ to turtles-born
   let temp-religion religion
   let temp-color color
 
-  hatch-humans 1[
+  if breed = humans
+  [
+    hatch-humans 1[
 
-    turtles-set-init-values
+      turtles-set-init-values
 
-    set religion temp-religion
-    set color temp-color
+      set religion temp-religion
+      set color temp-color
+    ]
+  ]
+
+  if breed = preachers
+  [
+    hatch-preachers 1[
+
+      turtles-set-init-values
+
+      set religion temp-religion
+      set color temp-color
+    ]
   ]
 
 end
@@ -268,7 +284,7 @@ to world-update
 
   set world-age world-age + 1
 
-  if (world-age mod 50 = 0)[set world-technological-advancement world-technological-advancement + 1] ;; Increasing the technological advancement of the world every N(50)years.
+  if (world-age mod 30 = 0)[set world-technological-advancement world-technological-advancement + 1] ;; Increasing the technological advancement of the world every N(50)years.
 
 end
 
@@ -276,7 +292,6 @@ end
 to world-event-check
 
   if world-events[
-
     if(world-age mod world-events-current-frequency = 0)[world-event-execute]   ;;We check if the world-event is to happen
 
   ]
@@ -287,15 +302,40 @@ to world-event-execute
 
   let impact-level random 6
   let impact-sign random 2
+  let religionID random 7
 
   show "*********************************"
   show "World Event Happening.."
-  show word "Impact Level: " impact-level
+  show word "Impact Level: " ( impact-level )
 
-  ifelse(impact-sign = 1)[show "Impact Sign: Positive"]
-  [show "Impact Sign: Negative"]
+  ifelse(impact-sign = 1)[show "Impact Sign: Negative"]
+  [show "Impact Sign: Positive"]
 
-  set world-events-current-frequency random world-events-frequency ;;Setting the current world event frequency
+  show word "Religion Effected: " item religionID world-religions
+
+  set world-events-current-frequency (random world-events-frequency) + 1 ;;Setting the current world event frequency
+  if(world-events-current-frequency < 200)[set world-events-frequency 300]
+
+  let percentage (count turtles with [religion = item religionID world-religions])/(impact-level + 4)
+
+  show word "Population effected: " percentage
+
+  ifelse impact-sign = 1[
+    ask n-of percentage turtles with[religion = item religionID world-religions]
+    [
+      let randomRel random 6
+
+      set religion item randomRel world-religions
+      set color item randomRel world-religions-colors
+    ]
+  ]
+  [
+    ask n-of percentage turtles
+    [
+      set religion item religionID world-religions
+      set color item religionID world-religions-colors
+    ]
+  ]
 
   ;; EXECUTE WORLD EVENT
 
@@ -317,7 +357,7 @@ to check-for-mutation
 
   if (breed = humans)[  ;; Mutate high-engaging humans into preachers
 
-    if(age > 18 AND religiosity >= 8 AND openness >= 8 AND trust > 8 AND influence > 7)[
+    if(age > 18 AND religiosity >= 8 AND openness >= 7 AND trust > 7 AND influence > 6)[
 
       hatch-preachers 1[
 
@@ -330,16 +370,18 @@ to check-for-mutation
 
   if (breed = preachers)[  ;; Mutate a rare preacher into a prophet
 
-    if(age > 30 AND religiosity = 10 AND openness = 10 AND trust = 10 AND influence = 10 AND religion != "atheism" AND count prophets = 0)[
+    if(age > 30 AND religiosity >= 10 AND openness >= 10 AND trust >= 10 AND influence >= 10 AND religion != "atheism" AND count prophets = 0)[
 
       hatch-prophets 1[
 
-        init-mutation age (lifespan + 150) religion religiosity openness trust influence
+        init-mutation age (lifespan + 50) religion religiosity openness trust influence
+
+
+        show "A new prophet has arrived!"
+        show word "Prophet religion: " religion
 
       ]
 
-      show "A new prophet has arrived!"
-      show word "Prophet religion: " religion
       die
     ]
   ]
@@ -363,7 +405,7 @@ to init-mutation[temp-age temp-lifespan temp-religion temp-religiosity temp-open
   if(breed = prophets)[
     set size 30
     set radius 30
-    set movementSpeed 5
+    set movementSpeed 7
   ]
 
 end
@@ -380,15 +422,151 @@ to print-agent-attributes
   show word "Influence: " influence
 
 end
+
+to human-interaction
+
+  let passed interaction-result openness trust influence
+
+  if passed = true[
+  ask other humans in-radius radius[
+
+      human-interaction-decision
+
+
+    ]
+  ]
+
+end
+
+to human-interaction-decision
+
+  turtle-change-random-attribute
+  check-for-mutation
+
+end
+
+to preacher-interaction
+
+  let passed interaction-result openness trust influence
+
+  if passed = true[
+  ask other humans in-radius radius[
+
+    preacher-interaction-decision religion color
+
+    ]
+
+    check-for-mutation
+  ]
+
+end
+
+to preacher-interaction-decision[newReligion newReligionColor]
+
+  ;; ADD RELIGION CHANGING ATTRIBUTE METHOD KADA DODAMO DA MOGU MJENATI RELIGIOSITY LJUDI ONDA CE BITI INTERESANTNIJE...
+
+  let believe-in-god? true
+
+  let peace-val world-peace-coefficient
+  let economy-val world-economy-coefficient
+
+  if (world-peace-options = "Simulated")[ set peace-val random 100 ]
+  if (world-economy-options = "Simulated")[ set economy-val random 100 ]
+
+
+  if(world-peace? = true)[set peace-val (peace-val * -1)]
+  if(world-economy? = true)[set economy-val (economy-val * -1)]
+
+  let religiosity-coefficient ( (peace-val + economy-val - ( (world-technological-advancement + 1) / 10) ) / 10)
+
+  if(religiosity + religiosity-coefficient < 3)[set believe-in-god? false]
+
+  ifelse (believe-in-god?)[
+
+    set religion newReligion
+    set color newReligionColor
+
+  ]
+  [
+
+    set religion "atheism"
+    set color red
+
+  ]
+
+  set openness openness - 3
+
+  check-for-mutation
+
+
+end
+
+to prophet-interaction
+
+
+  let newReligion religion
+  let newReligionColor color
+
+  ask other turtles in-radius radius[
+
+    prophet-interaction-decision newReligion newReligionColor
+  ]
+
+end
+
+to prophet-interaction-decision[newReligion newReligionColor]
+
+  set religion newReligion
+  set color newReligionColor
+
+  check-for-mutation
+
+end
+
+to-report interaction-result[temp-openness temp-trust temp-influence]
+
+  if(world-interaction-behavior = "Coefficient-Based")[
+
+    if (temp-openness + temp-trust + temp-influence) > world-interaction-coefficient [ report true ]
+
+  ]
+
+  if(world-interaction-behavior = "Simulated")[
+
+    let random-number random 31
+
+    if (temp-openness + temp-trust + temp-influence) < random-number [ report true ]
+
+  ]
+
+  report false
+
+end
+
+to turtle-change-random-attribute
+
+  let random-number random 3
+  let prefix random 2
+
+  if(prefix = 0)[set prefix -1]
+
+  if(random-number = 0 AND (openness > 0 AND openness < 11))[set openness openness + prefix]
+
+  if(random-number = 1 AND (trust > 0 AND trust < 11))[set trust trust + prefix]
+
+  if(random-number = 2 AND (influence > 0 AND influence < 11))[set influence influence + prefix]
+
+
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
-364
-81
-1276
-693
+361
+90
+1264
+659
 -1
 -1
-1.00333
+1.118
 1
 10
 1
@@ -399,9 +577,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-900
+800
 0
-600
+500
 0
 0
 1
@@ -479,7 +657,7 @@ world-events-impact-coefficient
 world-events-impact-coefficient
 0
 100
-30.0
+41.0
 1
 1
 NIL
@@ -494,7 +672,7 @@ population-size
 population-size
 0
 20000
-8082.0
+19863.0
 1
 1
 NIL
@@ -506,16 +684,16 @@ INPUTBOX
 163
 97
 world-events-frequency
-600.0
+300.0
 1
 0
 Number
 
 MONITOR
-786
-27
-864
-72
+683
+25
+761
+70
 Year
 world-age
 0
@@ -523,10 +701,10 @@ world-age
 11
 
 MONITOR
-886
-26
-1030
-71
+783
+24
+927
+69
 Technological Advancement
 world-technological-advancement
 2
@@ -534,10 +712,10 @@ world-technological-advancement
 11
 
 PLOT
-17
-564
-266
-721
+479
+689
+728
+839
 Population
 Time
 Agents
@@ -554,10 +732,10 @@ PENS
 "Prophets" 1.0 0 -1184463 true "" "plot count prophets"
 
 MONITOR
-282
-564
-342
-609
+396
+685
+456
+730
 Humans
 count humans
 1
@@ -565,10 +743,10 @@ count humans
 11
 
 MONITOR
-281
-622
-344
-667
+397
+738
+460
+783
 Preachers
 count preachers
 1
@@ -576,10 +754,10 @@ count preachers
 11
 
 MONITOR
-280
-675
-347
-720
+397
+794
+464
+839
 Prophets
 count prophets
 1
@@ -607,10 +785,10 @@ World Configuration
 1
 
 PLOT
-17
-389
-342
-539
+18
+686
+343
+836
 Followers over time
 Time
 Followers
@@ -631,10 +809,10 @@ PENS
 "Folk religions" 1.0 0 -1264960 true "" "plot count turtles with[religion = \"other-religion\"]"
 
 MONITOR
-109
-277
-181
-322
+110
+573
+182
+618
 Muslims
 count turtles with[religion = \"islam\"]
 17
@@ -642,10 +820,10 @@ count turtles with[religion = \"islam\"]
 11
 
 MONITOR
-19
-278
-93
-323
+20
+574
+94
+619
 Christians
 count turtles with[religion = \"christianity\"]
 17
@@ -653,10 +831,10 @@ count turtles with[religion = \"christianity\"]
 11
 
 MONITOR
-19
-335
-92
-380
+20
+631
+93
+676
 Budhists
 count turtles with[religion = \"budhism\"]
 17
@@ -664,10 +842,10 @@ count turtles with[religion = \"budhism\"]
 11
 
 MONITOR
-280
-276
-338
-321
+281
+572
+339
+617
 Atheists
 count turtles with[religion = \"atheism\"]
 17
@@ -675,10 +853,10 @@ count turtles with[religion = \"atheism\"]
 11
 
 MONITOR
-198
-276
-265
-321
+199
+572
+266
+617
 Hindus
 count turtles with[religion = \"atheism\"]
 17
@@ -686,10 +864,10 @@ count turtles with[religion = \"atheism\"]
 11
 
 MONITOR
-242
-335
-339
-380
+243
+631
+340
+676
 Other Religions
 count turtles with[religion = \"other-religion\"]
 17
@@ -697,10 +875,10 @@ count turtles with[religion = \"other-religion\"]
 11
 
 MONITOR
-109
-335
-226
-380
+110
+631
+227
+676
 Folk Religions
 count turtles with[religion = \"folk-religion\"]
 17
@@ -716,7 +894,7 @@ world-preachers-percentage-ui
 world-preachers-percentage-ui
 0
 20
-0.0
+5.0
 1
 1
 NIL
@@ -733,10 +911,10 @@ world-mortality
 0
 
 MONITOR
-1049
-26
-1139
-71
+946
+24
+1036
+69
 World Peace?
 world-peace?
 17
@@ -744,15 +922,120 @@ world-peace?
 11
 
 MONITOR
-1157
-26
-1263
-71
+1054
+24
+1160
+69
 Stable Economy?
 world-economy?
 17
 1
 11
+
+SLIDER
+16
+324
+226
+357
+world-interaction-coefficient
+world-interaction-coefficient
+0
+30
+22.5
+0.5
+1
+NIL
+HORIZONTAL
+
+CHOOSER
+17
+268
+188
+313
+world-interaction-behavior
+world-interaction-behavior
+"Simulated" "Coefficient-Based"
+1
+
+SLIDER
+19
+467
+164
+500
+world-peace-coefficient
+world-peace-coefficient
+0
+50
+20.0
+5
+1
+NIL
+HORIZONTAL
+
+SLIDER
+179
+468
+340
+501
+world-economy-coefficient
+world-economy-coefficient
+0
+50
+15.0
+5
+1
+NIL
+HORIZONTAL
+
+CHOOSER
+19
+409
+164
+454
+world-peace-options
+world-peace-options
+"Simulated" "Coefficient-Based"
+1
+
+CHOOSER
+178
+409
+341
+454
+world-economy-options
+world-economy-options
+"Simulated" "Coefficient-Based"
+1
+
+TEXTBOX
+206
+280
+356
+310
+Defines agent interaction behavior calculations
+12
+0.0
+1
+
+TEXTBOX
+94
+376
+345
+414
+Peace&Economy Coefficients
+15
+0.0
+1
+
+TEXTBOX
+89
+531
+283
+571
+Monitor and Output Data
+16
+0.0
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
