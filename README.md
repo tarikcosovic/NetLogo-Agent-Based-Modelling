@@ -18,3 +18,6 @@ and we ask the following questions:
 * Will the oldest religions remain the most popular and dominant?
 * Will young religions or emerging ones take over?
 * Will agents stop believing in religion as the world’s technological coefficient rises?
+
+![Development of Religion interface](https://user-images.githubusercontent.com/16970439/112066313-673e6700-8b66-11eb-977e-7986ddb46cf7.png)
+
