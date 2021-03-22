@@ -1,7 +1,0 @@
-HIGH PRIORITY: Add Agent Behaviors
-
-DONE: Add Agent Mutation -> AFTER Successful trade of skill from another agent
-
-MEDIUM PRIORITY: ADD WORLD EVENTS IMPACT 
-
-LOW PRIORITY: Add Video-Recording and Data Output
